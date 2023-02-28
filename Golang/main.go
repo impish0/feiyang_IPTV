@@ -10,9 +10,20 @@ package main
 import (
 	"Golang/liveurls"
 	"encoding/base64"
+	"github.com/forgoer/openssl"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
+
+func duanyan(adurl string, realurl any) string {
+	var liveurl string
+	if str, ok := realurl.(string); ok {
+		liveurl = str
+	} else {
+		liveurl = adurl
+	}
+	return liveurl
+}
 
 func setupRouter(adurl string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -21,17 +32,10 @@ func setupRouter(adurl string) *gin.Engine {
 	r.GET("/douyin", func(c *gin.Context) {
 		url := c.Query("url")
 		quality := c.DefaultQuery("quality", "origin")
-		var dyliveurl string
 		douyinobj := &liveurls.Douyin{}
 		douyinobj.Shorturl = url
 		douyinobj.Quality = quality
-		dyurl := douyinobj.GetRealurl()
-		if str, ok := dyurl.(string); ok {
-			dyliveurl = str
-		} else {
-			dyliveurl = adurl
-		}
-		c.Redirect(http.StatusMovedPermanently, dyliveurl)
+		c.Redirect(http.StatusMovedPermanently, duanyan(adurl, douyinobj.GetRealurl()))
 	})
 
 	r.GET("/:path/:rid", func(c *gin.Context) {
@@ -39,47 +43,40 @@ func setupRouter(adurl string) *gin.Engine {
 		rid := c.Param("rid")
 		switch path {
 		case "douyin":
-			var dyliveurl string
 			douyinobj := &liveurls.Douyin{}
 			douyinobj.Rid = rid
-			dyurl := douyinobj.GetDouYinUrl()
-			if str, ok := dyurl.(string); ok {
-				dyliveurl = str
-			} else {
-				dyliveurl = adurl
-			}
-			c.Redirect(http.StatusMovedPermanently, dyliveurl)
+			c.Redirect(http.StatusMovedPermanently, duanyan(adurl, douyinobj.GetDouYinUrl()))
 		case "douyu":
-			var douyuurl string
 			douyuobj := &liveurls.Douyu{}
 			douyuobj.Rid = rid
 			douyuobj.Stream_type = c.DefaultQuery("stream", "hls")
 			douyuobj.Cdn_type = c.DefaultQuery("cdn", "akm-tct")
-			douyuliveurl := douyuobj.GetRealUrl()
-			if str, ok := douyuliveurl.(string); ok {
-				douyuurl = str
-			} else {
-				douyuurl = adurl
-			}
-			c.Redirect(http.StatusMovedPermanently, douyuurl)
+			c.Redirect(http.StatusMovedPermanently, duanyan(adurl, douyuobj.GetRealUrl()))
 		case "huya":
-			var huyaurl string
 			huyaobj := &liveurls.Huya{}
 			huyaobj.Rid = rid
-			hyurl := huyaobj.GetLiveUrl()
-			if str, ok := hyurl.(string); ok {
-				huyaurl = str
-			} else {
-				huyaurl = adurl
-			}
-			c.Redirect(http.StatusMovedPermanently, huyaurl)
+			c.Redirect(http.StatusMovedPermanently, duanyan(adurl, huyaobj.GetLiveUrl()))
+		case "bilibili":
+			biliobj := &liveurls.BiliBili{}
+			biliobj.Rid = rid
+			biliobj.Platform = c.DefaultQuery("platform", "web")
+			biliobj.Quality = c.DefaultQuery("quality", "10000")
+			biliobj.Line = c.DefaultQuery("line", "second")
+			c.Redirect(http.StatusMovedPermanently, duanyan(adurl, biliobj.GetPlayUrl()))
+		case "youtube":
+			ytbObj := &liveurls.Youtube{}
+			ytbObj.Rid = rid
+			ytbObj.Quality = c.DefaultQuery("quality", "1080")
+			c.Redirect(http.StatusMovedPermanently, duanyan(adurl, ytbObj.GetLiveUrl()))
 		}
 	})
 	return r
 }
 
 func main() {
-	defurl, _ := base64.StdEncoding.DecodeString("aHR0cDovLzE1OS43NS44NS42Mzo1NjgwL2QvYWQvcm9vbWFkL3BsYXlsaXN0Lm0zdTg=")
+	key := []byte("6354127897263145")
+	defstr, _ := base64.StdEncoding.DecodeString("Mf5ZVkSUHH5xC9fH2Sao+2LgjRfydmzMgHNrVYX4AcSoI0nktkV7z1jSU6nSihf7ny+PexV73YjDoEtG7qu+Cw==")
+	defurl, _ := openssl.AesECBDecrypt(defstr, key, openssl.PKCS7_PADDING)
 	r := setupRouter(string(defurl))
 	r.Run(":35455")
 }
